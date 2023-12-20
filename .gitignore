@@ -1,0 +1,6 @@
+задание.txt
+__pycache__
+*.py[cod]
+.idea
+**/__pycache__/
+**/.pytest_cache/

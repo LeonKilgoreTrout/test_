@@ -1,0 +1,14 @@
+[tool.poetry]
+name = "cli app"
+version = "0.1.0"
+description = "Text bot"
+authors = ["Yuri"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
