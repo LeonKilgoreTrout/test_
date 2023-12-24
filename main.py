@@ -1,6 +1,8 @@
 from __future__ import annotations
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
+from datetime import datetime, timezone
 import json
+from typing import Callable
 from uuid import uuid4
 
 
@@ -14,7 +16,7 @@ class Message:
 
     text: str
     sent_by: str
-    timestamp: str
+    time: str
 
 
 @dataclass
@@ -25,6 +27,17 @@ class Question:
     answer: str
     options: list[Question]
     actions: list[str]
+
+
+def log_message(message: Message) -> None:
+    log_to_save = asdict(message)
+    logfile = open(LOGS_PATH, "a", encoding="utf-8")
+    logfile.write(str(log_to_save) + "\n")
+    logfile.close()
+
+
+def get_current_utc_time() -> str:
+    return datetime.now(timezone.utc).strftime("%H:%M:%S")
 
 
 class Bot:
@@ -78,14 +91,26 @@ class Bot:
         questions = self._parse(scenario)
         return questions
 
-    def send(self, session: Session) -> str:
+    def send(self, session: Session) -> Message:
+        print("+++")
+        print(session.context)
         for question in self.questions:
+
             if question.key == session.context:
-                questions = [option.question for option in question.options]
+
+                questions = [option.question for option in question.options if option.question != "_"]
                 text = "\n".join(questions) + "\n"
-                to_view = question.answer + text
-                return to_view
-        return "ЫЩРАЗУАР"
+                message = question.answer + text
+                if question.actions:
+                    for action in question.actions:
+                        message += session.action(action)
+                return Message(message, str(self.id), get_current_utc_time())
+            else:
+                pass
+
+        # for action in question.actions:
+        #     message += session.action(action)
+        # return Message("sdsfe", str(self.id), get_current_utc_time())
 
 
 class Session:
@@ -98,21 +123,46 @@ class Session:
         self.bot = bot
         bot.sessions.append(self)
 
-    def compose_message(self, text: str, sent_by: str) -> Message:
-        message = Message(text=text, sent_by=sent_by, timestamp="sa")
-        self.history.append(message)
-        return message
-
     def loop(self) -> None:
         while True:
             bot_message = self.bot.send(self)
-            message = self.compose_message(bot_message, sent_by="bot")
-            self.user.get(message)
+            self.history.append(bot_message)
+            # for question in self.bot.questions:
+            #     if self.context not question.options:
+            #         self.context = STARTING_QUESTION
+            self.user.get(bot_message)
             user_message = self.user.send()
-            self.compose_message(user_message, sent_by=f"USER {self.user.id}")
+            self.history.append(user_message)
             for question in self.bot.questions:
-                if user_message == question.question:
+                # print("===", user_message.text)
+                # print(question.question, question.key)
+                if user_message.text == question.question:
                     self.context = question.key
+                else:
+                    if question.question == "_":
+                        self.context = "question_free"
+
+    def action(self, action: str) -> str:
+        available_to_ask = [
+            "В какой компании ты работаешь?",
+            "Чем компания занимается?",
+            "Кто тебя создал?"
+        ]
+        match action:
+            case "save_log":
+                log_message(self.history[-1])
+                return ""
+            case "time":
+                return get_current_utc_time()
+            case "amount":
+                amount = 0
+                for message in self.history:
+                    if message.sent_by == str(self.user.id):
+                        if message.text in available_to_ask:
+                            amount += 1
+                return str(amount)
+            case "leave":
+                self.user.disconnect()
 
 
 class User:
@@ -130,13 +180,13 @@ class User:
         bot.sessions.remove(self.session)
         self.session = None
 
-    def send(self) -> str:
+    def send(self) -> Message:
         if self.waiting:
             message = input(self.waiting).strip()
         else:
             message = ""
         self.waiting = False
-        return message
+        return Message(message, str(self.id), get_current_utc_time())
 
     def get(self, message: Message) -> None:
         self.waiting = message.text
