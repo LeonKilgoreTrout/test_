@@ -1,0 +1,136 @@
+[
+  {
+    "question_1": {
+      "question": "Запуск",
+      "actions": [
+      ],
+      "answer": "Тебе доступны следующие команды:\n",
+      "options": [
+        {
+          "question_2": {
+            "question": "Начать общение",
+            "actions": [
+            ],
+            "answer": "Привет! Меня зовут Веселбот, чем я могу быть полезен?",
+            "options": [
+            ]
+          }
+        },
+        {
+          "question_3": {
+            "question": "Задать вопрос",
+            "actions": [
+            ],
+            "answer": "На такие вопросы я умею отвечать:\n",
+            "options": [
+              {
+                "question_4": {
+                  "question": "В какой компании ты работаешь?",
+                  "actions": [
+                  ],
+                  "answer": "Неовокс Технологии",
+                  "options": [
+                  ]
+                }
+              },
+              {
+                "question_5": {
+                  "question": "Чем компания занимается?",
+                  "actions": [
+                  ],
+                  "answer": "Разработкой голосовых ботов",
+                  "options": [
+                  ]
+                }
+              },
+              {
+                "question_6": {
+                  "question": "Кто тебя создал?",
+                  "actions": [
+                  ],
+                  "answer": "Разработчик",
+                  "options": [
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "question_7": {
+            "question": "Написать сообщение",
+            "actions": [
+            ],
+            "answer": "Введите Ваше сообщение",
+            "options": [
+              {
+                "question_free": {
+                  "question": "_",
+                  "actions": [
+                    "save_log"
+                  ],
+                  "answer": "Ваше сообщение принято, мы сможем ответить на него позже.",
+                  "options": [
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        {
+          "question_8": {
+            "question": "Узнать текущее время",
+            "actions": [
+              "time"
+            ],
+            "answer": "Текущее время UTC: ",
+            "options": [
+            ]
+          }
+        },
+        {
+          "question_9": {
+            "question": "Узнать количество заданных вопросов",
+            "actions": [
+              "amount"
+            ],
+            "answer": "Количество заданных вопросов: ",
+            "options": [
+            ]
+          }
+        },
+        {
+          "question_10": {
+            "question": "Завершить общение",
+            "actions": [
+              "leave"
+            ],
+            "answer": "",
+            "options": [
+            ]
+          }
+        }
+      ]
+    }
+  },
+  {
+    "question_11": {
+      "question": "__",
+      "actions": [
+      ],
+      "answer": "Не могу распознать Вашу просьбу",
+      "options": [
+      ]
+    }
+  },
+  {
+    "question_12": {
+      "question": "__",
+      "actions": [
+      ],
+      "answer": "Конец",
+      "options": [
+      ]
+    }
+  }
+]

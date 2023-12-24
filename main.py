@@ -1,159 +1,152 @@
-from datetime import datetime, timezone
+from __future__ import annotations
+from dataclasses import dataclass
 import json
-from typing import Literal
 from uuid import uuid4
 
 
-Command = Literal["start", "ask", "message", "time", "amount", "leave", "run"]
+LOGS_PATH = "questions.log"
+SCENARIO_PATH = "scenarios.json"
+STARTING_QUESTION = "question_1"
+
+
+@dataclass
+class Message:
+
+    text: str
+    sent_by: str
+    timestamp: str
+
+
+@dataclass
+class Question:
+
+    key: str
+    question: str
+    answer: str
+    options: list[Question]
+    actions: list[str]
+
+
+class Bot:
+
+    questions: list[Question]
+    tree: list[Question]
+
+    def __init__(self):
+        self.running = False
+        self.sessions: list[Session] = []
+        self.id = 1
+
+    def start(self) -> None:
+        self.running = True
+        self.questions = []
+        self.tree = self._parse_questions()
+        self._loop()
+
+    def stop(self) -> None:
+        self.running = False
+
+    def _loop(self) -> None:
+        while self.running:
+            for session in self.sessions:
+                session.loop()
+
+    @staticmethod
+    def parse_scenario() -> list[dict]:
+        file = open(SCENARIO_PATH, encoding="utf-8")
+        scenario = json.load(file)
+        file.close()
+        return scenario
+
+    def _parse(self, options: list[dict]) -> list[Question]:
+        new_questions = []
+        for question in options:
+            for question_name, question_data in question.items():
+                q = Question(
+                    key=question_name,
+                    question=question_data["question"],
+                    answer=question_data["answer"],
+                    options=self._parse(question_data["options"]),
+                    actions=question_data["actions"]
+                )
+                new_questions.append(q)
+                self.questions.append(q)
+        return new_questions
+
+    def _parse_questions(self) -> list[Question]:
+        scenario = self.parse_scenario()
+        questions = self._parse(scenario)
+        return questions
+
+    def send(self, session: Session) -> str:
+        for question in self.questions:
+            if question.key == session.context:
+                questions = [option.question for option in question.options]
+                text = "\n".join(questions) + "\n"
+                to_view = question.answer + text
+                return to_view
+        return "ЫЩРАЗУАР"
+
+
+class Session:
+
+    def __init__(self, user: User, bot: Bot):
+        self.id = uuid4()
+        self.history: list[Message] = []
+        self.context = STARTING_QUESTION
+        self.user = user
+        self.bot = bot
+        bot.sessions.append(self)
+
+    def compose_message(self, text: str, sent_by: str) -> Message:
+        message = Message(text=text, sent_by=sent_by, timestamp="sa")
+        self.history.append(message)
+        return message
+
+    def loop(self) -> None:
+        while True:
+            bot_message = self.bot.send(self)
+            message = self.compose_message(bot_message, sent_by="bot")
+            self.user.get(message)
+            user_message = self.user.send()
+            self.compose_message(user_message, sent_by=f"USER {self.user.id}")
+            for question in self.bot.questions:
+                if user_message == question.question:
+                    self.context = question.key
 
 
 class User:
 
     def __init__(self):
         self.id = uuid4()
+        self.session = None
         self.waiting = False
-        self.question = None
-        self.asked_questions = 0
 
-    def message(self, message: str) -> None:
-        self.question = message
+    def connect(self, bot: Bot) -> None:
+        self.session = Session(self, bot)
 
+    def disconnect(self) -> None:
+        bot = self.session.bot
+        bot.sessions.remove(self.session)
+        self.session = None
 
-class Bot:
-    answers: str | list[str]
-    last_command = None
-
-    def __init__(self):
+    def send(self) -> str:
+        if self.waiting:
+            message = input(self.waiting).strip()
+        else:
+            message = ""
         self.waiting = False
-        self.current_user = None
-        self.user = None
-        static = self.load_commands()
-        self.available_commands = static["commands"]
-        self.questions = static["questions"]
+        return message
 
-    def command(self, command: Command | None) -> None:
-        if self.user:
-            match command:
-                case "run":
-                    self.waiting = True
-                    self.answers = list(self.available_commands.keys())
-                case "start":
-                    self.answers = "Привет! Меня зовут Веселбот, чем я могу быть полезен?"
-                case "leave":
-                    print("Всего доброго! Буду рад снова пообщаться ;)")
-                    self.waiting = False
-                case "time":
-                    self.answers = f"Текущее время UTC: {self.get_current_utc_time()}"
-                case "message":
-                    self.answers = "Введите Ваше сообщение"
-                    self.last_command = "message"
-                case "amount":
-                    self.answers = f"Кол-во заданных вопросов: {self.user.asked_questions}"
-                case "ask":
-                    self.answers = list(self.questions.keys())
-                    self.last_command = "ask"
-                case _:
-                    try:
-                        self.answers = self.questions[self.user.question]
-                        if self.last_command == "ask":
-                            self.user.asked_questions += 1
-                        else:
-                            self.answers = "Я не понимаю контекста. Введите команду текстом."
-                    except KeyError:
-                        if self.last_command == "message":
-                            self.answers = "Ваше сообщение принято, мы сможем ответить на него позже. " \
-                                           "Можете отправить ещё сообщение или ввести команду текстом"
-                            self.log_message()
-                        else:
-                            self.answers = "Я не понимаю контекста. Введите команду текстом."
-        else:
-            raise Exception
+    def get(self, message: Message) -> None:
+        self.waiting = message.text
 
-    def compose_answer(self) -> dict[str, str] | str:
-        if isinstance(self.answers, list):
-            return {str(ind + 1): answer for ind, answer in enumerate(self.answers)}
-        else:
-            return self.answers
-
-    def log_message(self) -> None:
-        log_to_save = {
-            "user_id": self.user.id,
-            "message": self.user.question,
-            "time": self.get_current_utc_time()
-        }
-        logfile = open("questions.log", "a")
-        logfile.write(str(log_to_save) + "\n")
-        logfile.close()
-
-    def parse_command(self, question: str) -> Command | None:
-        try:
-            return self.available_commands[question]
-        except KeyError:
-            return None
-
-    @staticmethod
-    def get_current_utc_time() -> str:
-        return datetime.now(timezone.utc).strftime("%H:%M:%S")
-
-    @staticmethod
-    def load_commands() -> dict[str, dict[str, str | Command]]:
-        file = open("tree.json", encoding="utf-8")
-        data = json.load(file)
-        file.close()
-        return data
+    def history(self) -> list[Message]:
+        return self.session.history
 
 
-class Session:
+bot = Bot()
+u = User()
+u.connect(bot)
+bot.start()
 
-    def __init__(self):
-        self.id = uuid4()
-        self.bot = Bot()
-        self.bot_prefix = "\t\t\t\t\t\t"
-
-    def view(self, answers_dict: dict[str, str]) -> str:
-        options = ""
-        for ind, answer in answers_dict.items():
-            options += f"\t{self.bot_prefix}({ind}) {answer}"
-            options += "\n"
-        return f"{self.bot_prefix}Доступны для выбора следуюшие опции:\n" + options
-
-    def loop(self) -> None:
-        while self.bot.waiting:
-            answers = self.bot.compose_answer()
-            if isinstance(answers, dict):
-                to_view = self.view(answers)
-                raw_message = input(to_view).strip()
-                if raw_message in answers.keys():
-                    message = answers[raw_message]
-                elif raw_message in answers.values():
-                    message = raw_message
-                else:
-                    message = "Я не понял Ваш вопрос"
-            else:
-                message = input(self.bot_prefix + answers + "\n").strip()
-                message = message
-            self.bot.user.message(message)
-            command = self.bot.parse_command(self.bot.user.question)
-            self.bot.command(command)
-            self.bot.user.waiting = False
-
-    def start(self):
-        self.bot.command("run")
-        if self.bot.user:
-            self.loop()
-        else:
-            raise Exception
-
-    def connect_user(self, user: User | None) -> None:
-        if isinstance(user, User):
-            self.bot.user = user
-        else:
-            raise Exception
-
-
-if __name__ == "__main__":
-
-    session = Session()
-    user = User()
-    session.connect_user(user)
-    session.start()
