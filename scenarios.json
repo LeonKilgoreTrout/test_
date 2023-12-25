@@ -4,7 +4,7 @@
       "question": "Запуск",
       "actions": [
       ],
-      "answer": "Тебе доступны следующие команды:\n",
+      "answer": "Вам доступны следующие команды:\n",
       "options": [
         {
           "question_2": {
@@ -105,7 +105,7 @@
             "actions": [
               "leave"
             ],
-            "answer": "",
+            "answer": "Всего доброго!",
             "options": [
             ]
           }
@@ -119,16 +119,6 @@
       "actions": [
       ],
       "answer": "Не могу распознать Вашу просьбу",
-      "options": [
-      ]
-    }
-  },
-  {
-    "question_12": {
-      "question": "__",
-      "actions": [
-      ],
-      "answer": "Конец",
       "options": [
       ]
     }

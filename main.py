@@ -2,7 +2,6 @@ from __future__ import annotations
 from dataclasses import dataclass, asdict
 from datetime import datetime, timezone
 import json
-from typing import Callable
 from uuid import uuid4
 
 
@@ -92,8 +91,6 @@ class Bot:
         return questions
 
     def send(self, session: Session) -> Message:
-        print("+++")
-        print(session.context)
         for question in self.questions:
 
             if question.key == session.context:
@@ -108,10 +105,6 @@ class Bot:
             else:
                 pass
 
-        # for action in question.actions:
-        #     message += session.action(action)
-        # return Message("sdsfe", str(self.id), get_current_utc_time())
-
 
 class Session:
 
@@ -121,26 +114,29 @@ class Session:
         self.context = STARTING_QUESTION
         self.user = user
         self.bot = bot
+        self.running = True
         bot.sessions.append(self)
 
     def loop(self) -> None:
-        while True:
+        while self.running:
             bot_message = self.bot.send(self)
             self.history.append(bot_message)
-            # for question in self.bot.questions:
-            #     if self.context not question.options:
-            #         self.context = STARTING_QUESTION
             self.user.get(bot_message)
             user_message = self.user.send()
             self.history.append(user_message)
+            context_not_changed = True
             for question in self.bot.questions:
-                # print("===", user_message.text)
-                # print(question.question, question.key)
                 if user_message.text == question.question:
                     self.context = question.key
+                    context_not_changed = False
+            if context_not_changed:
+                if bot_message.text == "Введите Ваше сообщение\n":
+                    self.context = "question_free"
                 else:
-                    if question.question == "_":
-                        self.context = "question_free"
+                    if self.running:
+                        print("К сожалению у меня не получилось найти то, что Вам нужно.")
+                        self.context = STARTING_QUESTION
+        self.bot.running = False
 
     def action(self, action: str) -> str:
         available_to_ask = [
@@ -162,7 +158,9 @@ class Session:
                             amount += 1
                 return str(amount)
             case "leave":
+                self.running = False
                 self.user.disconnect()
+                return ""
 
 
 class User:
@@ -176,8 +174,7 @@ class User:
         self.session = Session(self, bot)
 
     def disconnect(self) -> None:
-        bot = self.session.bot
-        bot.sessions.remove(self.session)
+        del self.session
         self.session = None
 
     def send(self) -> Message:
@@ -195,8 +192,9 @@ class User:
         return self.session.history
 
 
-bot = Bot()
-u = User()
-u.connect(bot)
-bot.start()
+if __name__ == "__main__":
+    bot = Bot()
+    u = User()
+    u.connect(bot)
+    bot.start()
 
